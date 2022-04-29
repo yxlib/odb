@@ -35,7 +35,6 @@ type Cacheable interface {
 }
 
 type DBTableRow interface {
-	yx.Reuseable
 	Cacheable
 }
 
