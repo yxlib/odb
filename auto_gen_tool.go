@@ -88,7 +88,7 @@ func writeRegFunc(rowObjClasses *yx.Set, regPackName string, f *os.File) {
 		if filePackName == regPackName {
 			filePackClassName = yx.GetClassName(classReflectName)
 		}
-		f.WriteString("    gamedb.RowObjRegister.RegisterObject(&" + filePackClassName + "{}, nil, 10)\n")
+		f.WriteString("    gamedb.RowObjFactory.RegisterObject(&" + filePackClassName + "{}, nil, 10)\n")
 
 		f.WriteString("\n")
 	}
