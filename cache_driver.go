@@ -52,6 +52,7 @@ func (d *CacheDriver) Open(addr string, pwd string, db int) error {
 		return d.ec.Throw("Open", err)
 	}
 
+	d.logger.I("open redis " + addr + " success")
 	return nil
 }
 

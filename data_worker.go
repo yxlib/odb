@@ -6,7 +6,9 @@ package gamedb
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 )
 
 var (
+	ErrNoCache                  = errors.New("no cache")
+	ErrNoDb                     = errors.New("no db")
 	ErrWorkerObjectIsNil        = errors.New("object is nil")
 	ErrWorkerRowObjIsNil        = errors.New("row object is nil")
 	ErrWorkerInsertFieldNotFind = errors.New("insert field not find")
@@ -52,6 +56,7 @@ type DataWorker struct {
 	updateSql             string
 	setUpdatedCacheKeys   *yx.Set
 	lckUpdatedCacheKeys   *sync.Mutex
+	bAutoSave             bool
 	evtStop               *yx.Event
 	evtExit               *yx.Event
 	logger                *yx.Logger
@@ -73,6 +78,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2
 		updateSql:             "",
 		setUpdatedCacheKeys:   yx.NewSet(yx.SET_TYPE_OBJ),
 		lckUpdatedCacheKeys:   &sync.Mutex{},
+		bAutoSave:             false,
 		evtStop:               yx.NewEvent(),
 		evtExit:               yx.NewEvent(),
 		logger:                yx.NewLogger("DataWorker"),
@@ -86,7 +92,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2
 	return w
 }
 
-func (w *DataWorker) Init(reflectName string, insertTag string, selectKeyTag string, updateKeyTag string, updateIgnoreTag string) error {
+func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string, selectKeyTag string, updateTag string, updateKeyTag string) error {
 	var err error = nil
 	defer w.ec.DeferThrow("Init", &err)
 
@@ -101,23 +107,34 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectKeyTag str
 
 	err = w.initInsertSql(rowObj, insertTag)
 	if err != nil {
-		return err
+		w.ec.Catch("Init", &err)
 	}
 
-	err = w.initSelectSql(rowObj, selectKeyTag)
+	err = w.initSelectSql(rowObj, selectTag, selectKeyTag)
 	if err != nil {
-		return err
+		w.ec.Catch("Init", &err)
 	}
 
-	err = w.initUpdateSql(rowObj, updateKeyTag, updateIgnoreTag)
+	err = w.initUpdateSql(rowObj, updateTag, updateKeyTag)
 	if err != nil {
-		return err
+		w.ec.Catch("Init", &err)
 	}
 
 	return nil
 }
 
+func (w *DataWorker) HasCache() bool {
+	return w.cacheDriver != nil
+}
+
+func (w *DataWorker) HasDb() bool {
+	return w.dbDriver != nil
+}
+
 func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration) {
+	w.logger.I("Auto save for table: ", w.tableName)
+
+	w.bAutoSave = true
 	saveTicker := time.NewTicker(saveIntv)
 	clearExpireTick := time.NewTicker(clearExpireIntv)
 
@@ -139,20 +156,33 @@ Exit0:
 	saveTicker.Stop()
 	clearExpireTick.Stop()
 	w.evtExit.Send()
+	w.bAutoSave = false
 }
 
 func (w *DataWorker) Stop() {
+	if !w.bAutoSave {
+		return
+	}
+
 	w.evtStop.Send()
 	w.evtExit.Wait()
 }
 
 func (w *DataWorker) LoadFromCache(obj Cacheable, key string) error {
+	if !w.HasCache() {
+		return w.ec.Throw("LoadFromCache", ErrNoCache)
+	}
+
 	cacheKey := w.getCacheKey(key)
 	err := w.loadFromCacheImpl(obj, cacheKey)
 	return w.ec.Throw("LoadFromCache", err)
 }
 
 func (w *DataWorker) GetAllCacheKeys() ([]string, error) {
+	if !w.HasCache() {
+		return nil, w.ec.Throw("GetAllCacheKeys", ErrNoCache)
+	}
+
 	keys, err := w.cacheDriver.Keys(w.tableName + "_" + "*")
 	return keys, w.ec.Throw("GetAllCacheKeys", err)
 }
@@ -160,6 +190,11 @@ func (w *DataWorker) GetAllCacheKeys() ([]string, error) {
 func (w *DataWorker) GetCacheData(obj Cacheable, key string, fields ...string) error {
 	var err error = nil
 	defer w.ec.DeferThrow("GetCacheData", &err)
+
+	if !w.HasCache() {
+		err = ErrNoCache
+		return err
+	}
 
 	if obj == nil {
 		err = ErrWorkerObjectIsNil
@@ -178,6 +213,11 @@ func (w *DataWorker) GetCacheData(obj Cacheable, key string, fields ...string) e
 func (w *DataWorker) GetCacheDataToMap(key string, fields ...string) (map[string]string, error) {
 	var err error = nil
 	defer w.ec.DeferThrow("GetCacheDataToMap", &err)
+
+	if !w.HasCache() {
+		err = ErrNoCache
+		return nil, err
+	}
 
 	cacheKey := w.getCacheKey(key)
 	datas, err := w.cacheDriver.HMGet(cacheKey, fields...)
@@ -207,6 +247,11 @@ func (w *DataWorker) SetCacheData(obj Cacheable, key string, fields ...string) e
 	var err error = nil
 	defer w.ec.DeferThrow("SetCacheData", &err)
 
+	if !w.HasCache() {
+		err = ErrNoCache
+		return err
+	}
+
 	if obj == nil {
 		err = ErrWorkerObjectIsNil
 		return err
@@ -223,6 +268,10 @@ func (w *DataWorker) SetCacheData(obj Cacheable, key string, fields ...string) e
 }
 
 func (w *DataWorker) SetCacheDataByMap(key string, mapField2Val map[string]interface{}) error {
+	if !w.HasCache() {
+		return w.ec.Throw("SetCacheDataByMap", ErrNoCache)
+	}
+
 	cacheKey := w.getCacheKey(key)
 	err := w.cacheDriver.HMSet(cacheKey, mapField2Val)
 	if err != nil {
@@ -234,6 +283,10 @@ func (w *DataWorker) SetCacheDataByMap(key string, mapField2Val map[string]inter
 }
 
 func (w *DataWorker) SetCacheExpire(key string, expiration time.Duration) error {
+	if !w.HasCache() {
+		return w.ec.Throw("SetCacheExpire", ErrNoCache)
+	}
+
 	cacheKey := w.getCacheKey(key)
 	_, err := w.cacheDriver.Expire(cacheKey, expiration)
 	return w.ec.Throw("SetCacheExpire", err)
@@ -242,6 +295,11 @@ func (w *DataWorker) SetCacheExpire(key string, expiration time.Duration) error 
 func (w *DataWorker) ClearExpireCaches() error {
 	var err error = nil
 	defer w.ec.DeferThrow("ClearExpireCaches", &err)
+
+	if !w.HasCache() {
+		err = ErrNoCache
+		return err
+	}
 
 	keys, err := w.cacheDriver.Keys(w.tableName + "_" + "*")
 	if err != nil {
@@ -267,6 +325,10 @@ func (w *DataWorker) ClearExpireCaches() error {
 }
 
 func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
+	if !w.HasDb() {
+		return 0, w.ec.Throw("InsertToDb", ErrNoDb)
+	}
+
 	lastId, err := w.dbDriver.NameInsert(w.insertSql, mapper)
 	if err != nil {
 		return 0, w.ec.Throw("InsertToDb", err)
@@ -275,24 +337,37 @@ func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
 	return lastId, nil
 }
 
+func (w *DataWorker) SelectRowsFromDb(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
+	if !w.HasDb() {
+		return nil, w.ec.Throw("SelectRowsFromDb", ErrNoDb)
+	}
+
+	rows, err := w.selectImpl(mapper, limitCnt)
+	return rows, w.ec.Throw("SelectRowsFromDb", err)
+}
+
 func (w *DataWorker) SelectFromDb(mapper interface{}) (DBTableRow, error) {
-	var err error = nil
-	defer w.ec.DeferThrow("SelectFromDb", &err)
+	if !w.HasDb() {
+		return nil, w.ec.Throw("SelectFromDb", ErrNoDb)
+	}
 
-	results, err := w.dbDriver.NameQuery(w.rowReflectName, w.selectSql, mapper)
+	rows, err := w.selectImpl(mapper, 1)
 	if err != nil {
-		return nil, err
+		return nil, w.ec.Throw("SelectFromDb", err)
 	}
 
-	if len(results) == 0 {
-		err = ErrWorkerDBNotExist
-		return nil, err
+	if len(rows) == 0 {
+		return nil, w.ec.Throw("SelectFromDb", ErrWorkerDBNotExist)
 	}
 
-	return results[0], nil
+	return rows[0], nil
 }
 
 func (w *DataWorker) UpdateToDb(mapper interface{}) error {
+	if !w.HasDb() {
+		return w.ec.Throw("UpdateToDb", ErrNoDb)
+	}
+
 	err := w.dbDriver.NameExec(w.updateSql, mapper)
 	return w.ec.Throw("UpdateToDb", err)
 }
@@ -300,6 +375,11 @@ func (w *DataWorker) UpdateToDb(mapper interface{}) error {
 func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	var err error = nil
 	defer w.ec.DeferThrow("PreloadData", &err)
+
+	if !w.HasDb() {
+		err = ErrNoDb
+		return err
+	}
 
 	// load from db
 	rowObj, err := w.SelectFromDb(mapper)
@@ -344,13 +424,20 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 }
 
 func (w *DataWorker) SetCacheUpdated(key string) {
+	if !w.HasCache() || !w.HasDb() {
+		return
+	}
+
 	cacheKey := w.getCacheKey(key)
 	w.setCacheUpdatedImpl(cacheKey)
 }
 
 func (w *DataWorker) SaveCaches() error {
-	var err error = nil
+	if !w.HasCache() || !w.HasDb() {
+		return ErrNoCache
+	}
 
+	var err error = nil
 	cacheKeys := w.popUpdatedCacheKeys()
 	for _, cacheKey := range cacheKeys {
 		err = w.saveCache(cacheKey)
@@ -454,9 +541,9 @@ func (w *DataWorker) saveCache(cacheKey string) error {
 
 func (w *DataWorker) initInsertSql(tableObj interface{}, insertTag string) error {
 	v := reflect.TypeOf(tableObj).Elem()
-	fieldSql := ""
-	valSql := ""
 
+	insertFields := make([]string, 0)
+	insertValues := make([]string, 0)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
@@ -464,42 +551,28 @@ func (w *DataWorker) initInsertSql(tableObj interface{}, insertTag string) error
 			continue
 		}
 
-		if field.Tag.Get(insertTag) == "" {
-			continue
+		if field.Tag.Get(insertTag) != "" { // tag field
+			insertFields = append(insertFields, name)
+			insertValues = append(insertValues, ":"+name)
 		}
-
-		if fieldSql != "" {
-			fieldSql += ", "
-			valSql += ", "
-		}
-
-		fieldSql += name
-		valSql += ":" + name
 	}
 
-	if fieldSql == "" {
+	if len(insertFields) == 0 {
 		return w.ec.Throw("initInsertSql", ErrWorkerInsertFieldNotFind)
 	}
 
-	w.insertSql = "INSERT INTO " + w.tableName + " (" + fieldSql + ") VALUES (" + valSql + ")"
+	fieldStr := strings.Join(insertFields, ",")
+	valueStr := strings.Join(insertValues, ",")
+	w.insertSql = "INSERT INTO " + w.tableName + " (" + fieldStr + ") VALUES (" + valueStr + ")"
+	w.logger.D("Insert SQL: ", w.insertSql)
 	return nil
 }
 
-func (w *DataWorker) initSelectSql(tableObj interface{}, keyTag string) error {
-	keyField, err := w.findKeyField(tableObj, keyTag)
-	if err != nil {
-		return w.ec.Throw("initSelectSql", err)
-	}
-
-	w.selectSql = "SELECT * FROM " + w.tableName + " WHERE " + keyField + "=:" + keyField + " LIMIT 1"
-	return nil
-}
-
-func (w *DataWorker) initUpdateSql(tableObj interface{}, keyTag string, ignoreTag string) error {
+func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTag string) error {
 	v := reflect.TypeOf(tableObj).Elem()
-	sql := ""
-	keyField := ""
 
+	selectFields := make([]string, 0)
+	condFields := make([]string, 0)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
@@ -507,50 +580,86 @@ func (w *DataWorker) initUpdateSql(tableObj interface{}, keyTag string, ignoreTa
 			continue
 		}
 
+		if field.Tag.Get(selectTag) != "" { // tag field
+			selectFields = append(selectFields, name)
+			continue
+		}
+
 		if field.Tag.Get(keyTag) != "" { // key field
-			keyField = name
-			continue
+			condFields = append(condFields, name+"=:"+name)
 		}
-
-		if name == ignoreTag {
-			continue
-		}
-
-		if sql != "" {
-			sql += ", "
-		}
-
-		sql += name + "=:" + name
 	}
 
-	if keyField == "" {
+	// conditions
+	if len(condFields) == 0 {
+		return w.ec.Throw("initSelectSql", ErrWorkerKeyFieldNotDefine)
+	}
+
+	condStr := strings.Join(condFields, " AND ")
+
+	// fields
+	fieldStr := ""
+	if len(selectFields) == 0 {
+		fieldStr = "*"
+	} else {
+		fieldStr = strings.Join(selectFields, ",")
+	}
+
+	w.selectSql = "SELECT " + fieldStr + " FROM " + w.tableName + " WHERE " + condStr
+	w.logger.D("Select SQL: ", w.selectSql)
+	return nil
+}
+
+func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTag string) error {
+	v := reflect.TypeOf(tableObj).Elem()
+	// sql := ""
+	// keyField := ""
+
+	updateFields := make([]string, 0)
+	condFields := make([]string, 0)
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		name := field.Tag.Get("db")
+		if name == "" {
+			continue
+		}
+
+		if field.Tag.Get(updateTag) != "" { // tag field
+			updateFields = append(updateFields, name+"=:"+name)
+			continue
+		}
+
+		if field.Tag.Get(keyTag) != "" { // key field
+			condFields = append(condFields, name+"=:"+name)
+		}
+	}
+
+	// conditions
+	if len(condFields) == 0 {
 		return w.ec.Throw("initUpdateSql", ErrWorkerKeyFieldNotDefine)
 	}
 
-	w.updateSql = "UPDATE " + w.tableName + " SET " + sql + " WHERE " + keyField + "=:" + keyField
+	if len(updateFields) == 0 {
+		return w.ec.Throw("initUpdateSql", ErrWorkerKeyFieldNotDefine)
+	}
+
+	condStr := strings.Join(condFields, " AND ")
+	fieldStr := strings.Join(updateFields, ",")
+
+	w.updateSql = "UPDATE " + w.tableName + " SET " + fieldStr + " WHERE " + condStr
+	w.logger.D("Update SQL: ", w.updateSql)
 	return nil
 }
 
-func (w *DataWorker) findKeyField(tableObj interface{}, keyTag string) (string, error) {
-	v := reflect.TypeOf(tableObj).Elem()
-	keyField := ""
+func (w *DataWorker) selectImpl(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
+	var err error = nil
+	defer w.ec.DeferThrow("selectImpl", &err)
 
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		name := field.Tag.Get("db")
-		if name == "" {
-			continue
-		}
-
-		if field.Tag.Get(keyTag) != "" { // key field
-			keyField = name
-			break
-		}
+	selectSql := fmt.Sprintf("%s LIMIT %d", w.selectSql, limitCnt)
+	rows, err := w.dbDriver.NameQuery(w.rowReflectName, selectSql, mapper)
+	if err != nil {
+		return nil, w.ec.Throw("selectImpl", err)
 	}
 
-	if keyField == "" {
-		return "", w.ec.Throw("findKeyField", ErrWorkerKeyFieldNotDefine)
-	}
-
-	return keyField, nil
+	return rows, nil
 }

@@ -49,7 +49,7 @@ func (d *DbDriver) Open(userName string, pwd string, host string, port uint16, d
 	}
 
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s", userName, pwd, host, port, database, charset)
-	d.logger.I("open db: ", dataSourceName)
+	d.logger.D("open db: ", dataSourceName)
 	db, err := sqlx.Open("mysql", dataSourceName)
 	if err != nil {
 		return err
@@ -62,6 +62,7 @@ func (d *DbDriver) Open(userName string, pwd string, host string, port uint16, d
 
 	d.db = db
 
+	d.logger.I("open mysql success")
 	return nil
 }
 

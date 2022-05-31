@@ -28,9 +28,10 @@ type WorkerConf struct {
 	TableName             string            `json:"table_name"`
 	RowObj                string            `json:"row_obj"`
 	InsertTag             string            `json:"insert_tag"`
+	SelectTag             string            `json:"select_tag"`
 	SelectKeyTag          string            `json:"select_key_tag"`
+	UpdateTag             string            `json:"update_tag"`
 	UpdateKeyTag          string            `json:"update_key_tag"`
-	UpdateIgnoreTag       string            `json:"update_ignore_tag"`
 }
 
 type StorageConf struct {

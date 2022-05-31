@@ -35,9 +35,10 @@
                     "table_name" : "table1",
                     "row_obj" : "github.com/yxlib/gamedb.TestTable1Row",
                     "insert_tag" : "insert",
+                    "select_tag" : "select",
                     "select_key_tag" : "select_key",
-                    "update_key_tag" : "update_key",
-                    "update_ignore_tag" : "update_ignore"
+                    "update_tag" : "update",
+                    "update_key_tag" : "update_key"
                 }
             ]
         }
