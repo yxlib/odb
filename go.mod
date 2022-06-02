@@ -1,4 +1,4 @@
-module github.com/yxlib/gamedb
+module github.com/yxlib/odb
 
 go 1.16
 

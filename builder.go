@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gamedb
+package odb
 
 import "github.com/yxlib/yx"
 
@@ -11,7 +11,7 @@ type builder struct {
 }
 
 var Builder = &builder{
-	logger: yx.NewLogger("gamedb.Builder"),
+	logger: yx.NewLogger("odb.Builder"),
 }
 
 func (b *builder) Build(dc *DataCenter, cfg *Config) {

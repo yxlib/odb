@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gamedb
+package odb
 
 import (
 	"os"
@@ -33,7 +33,7 @@ func GenRowObjRegisterFileByCfg(cfg *Config, regFilePath string, regPackName str
 func writePackage(f *os.File, regPackName string) {
 	f.WriteString("// This File auto generate by tool.\n")
 	f.WriteString("// Please do not modify.\n")
-	f.WriteString("// See gamedb.GenRowObjRegisterFileByCfg().\n\n")
+	f.WriteString("// See odb.GenRowObjRegisterFileByCfg().\n\n")
 	f.WriteString("package " + regPackName + "\n\n")
 }
 
@@ -41,7 +41,7 @@ func writeImport(rowObjClasses *yx.Set, regPackName string, f *os.File) {
 	f.WriteString("import (\n")
 
 	packSet := yx.NewSet(yx.SET_TYPE_OBJ)
-	packSet.Add("github.com/yxlib/gamedb")
+	packSet.Add("github.com/yxlib/odb")
 
 	classNames := rowObjClasses.GetElements()
 	for _, className := range classNames {
@@ -88,7 +88,7 @@ func writeRegFunc(rowObjClasses *yx.Set, regPackName string, f *os.File) {
 		if filePackName == regPackName {
 			filePackClassName = yx.GetClassName(classReflectName)
 		}
-		f.WriteString("    gamedb.RowObjFactory.RegisterObject(&" + filePackClassName + "{}, nil, 10)\n")
+		f.WriteString("    odb.RowObjFactory.RegisterObject(&" + filePackClassName + "{}, nil, 10)\n")
 
 		f.WriteString("\n")
 	}
