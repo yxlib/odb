@@ -582,7 +582,6 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 
 		if field.Tag.Get(selectTag) != "" { // tag field
 			selectFields = append(selectFields, name)
-			continue
 		}
 
 		if field.Tag.Get(keyTag) != "" { // key field
