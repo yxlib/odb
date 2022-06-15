@@ -390,7 +390,7 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	defer w.dbDriver.ReuseTableRow(rowObj, w.rowReflectName)
 
 	// key
-	mapField2Val, err := rowObj.ToCache([]string{w.cacheKeyName})
+	mapField2Val, err := rowObj.ToCache(w.cacheFields)
 	if err != nil {
 		return err
 	}
