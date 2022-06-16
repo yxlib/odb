@@ -704,7 +704,11 @@ func (w *DataWorker) selectImpl(mapper interface{}, limitCnt int) ([]DBTableRow,
 	var err error = nil
 	defer w.ec.DeferThrow("selectImpl", &err)
 
-	selectSql := fmt.Sprintf("%s LIMIT %d", w.selectSql, limitCnt)
+	selectSql := w.selectSql
+	if limitCnt > 0 {
+		selectSql = fmt.Sprintf("%s LIMIT %d", w.selectSql, limitCnt)
+	}
+
 	rows, err := w.dbDriver.NameQuery(w.rowReflectName, selectSql, mapper)
 	if err != nil {
 		return nil, w.ec.Throw("selectImpl", err)
