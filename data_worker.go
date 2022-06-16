@@ -16,17 +16,18 @@ import (
 )
 
 var (
-	ErrNoCache                  = errors.New("no cache")
-	ErrNoDb                     = errors.New("no db")
-	ErrWorkerObjectIsNil        = errors.New("object is nil")
-	ErrWorkerRowObjIsNil        = errors.New("row object is nil")
-	ErrWorkerInsertFieldNotFind = errors.New("insert field not find")
-	ErrWorkerKeyFieldNotDefine  = errors.New("key field not define")
-	ErrWorkerCacheNotExist      = errors.New("cache data no exist")
-	ErrWorkerDBNotExist         = errors.New("db data no data")
-	ErrWorkerFieldNotExist      = errors.New("some field not exist")
-	ErrWorkerCacheKeyNotFind    = errors.New("cache key not define")
-	ErrWorkerCacheKeyNotString  = errors.New("cache key not string")
+	ErrNoCache                   = errors.New("no cache")
+	ErrNoDb                      = errors.New("no db")
+	ErrWorkerObjectIsNil         = errors.New("object is nil")
+	ErrWorkerRowObjIsNil         = errors.New("row object is nil")
+	ErrWorkerInsertFieldNotFind  = errors.New("insert field not find")
+	ErrWorkerReplaceFieldNotFind = errors.New("insert field and update field not find")
+	ErrWorkerKeyFieldNotDefine   = errors.New("key field not define")
+	ErrWorkerCacheNotExist       = errors.New("cache data no exist")
+	ErrWorkerDBNotExist          = errors.New("db data no data")
+	ErrWorkerFieldNotExist       = errors.New("some field not exist")
+	ErrWorkerCacheKeyNotFind     = errors.New("cache key not define")
+	ErrWorkerCacheKeyNotString   = errors.New("cache key not string")
 )
 
 const (
@@ -52,6 +53,7 @@ type DataWorker struct {
 	rowReflectName        string
 	keyField              string
 	insertSql             string
+	replaceSql            string
 	selectSql             string
 	updateSql             string
 	setUpdatedCacheKeys   *yx.Set
@@ -74,6 +76,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2
 		rowReflectName:        "",
 		keyField:              "",
 		insertSql:             "",
+		replaceSql:            "",
 		selectSql:             "",
 		updateSql:             "",
 		setUpdatedCacheKeys:   yx.NewSet(yx.SET_TYPE_OBJ),
@@ -106,6 +109,11 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string
 	defer w.dbDriver.ReuseTableRow(rowObj, reflectName)
 
 	err = w.initInsertSql(rowObj, insertTag)
+	if err != nil {
+		w.ec.Catch("Init", &err)
+	}
+
+	err = w.initReplaceSql(rowObj, insertTag, updateTag)
 	if err != nil {
 		w.ec.Catch("Init", &err)
 	}
@@ -337,6 +345,19 @@ func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
 	return lastId, nil
 }
 
+func (w *DataWorker) ReplaceToDb(mapper interface{}) error {
+	if !w.HasDb() {
+		return w.ec.Throw("ReplaceToDb", ErrNoDb)
+	}
+
+	err := w.dbDriver.NameExec(w.replaceSql, mapper)
+	if err != nil {
+		return w.ec.Throw("ReplaceToDb", err)
+	}
+
+	return nil
+}
+
 func (w *DataWorker) SelectRowsFromDb(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
 	if !w.HasDb() {
 		return nil, w.ec.Throw("SelectRowsFromDb", ErrNoDb)
@@ -565,6 +586,35 @@ func (w *DataWorker) initInsertSql(tableObj interface{}, insertTag string) error
 	valueStr := strings.Join(insertValues, ",")
 	w.insertSql = "INSERT INTO " + w.tableName + " (" + fieldStr + ") VALUES (" + valueStr + ")"
 	w.logger.D("Insert SQL: ", w.insertSql)
+	return nil
+}
+
+func (w *DataWorker) initReplaceSql(tableObj interface{}, insertTag string, updateTag string) error {
+	v := reflect.TypeOf(tableObj).Elem()
+
+	replaceFields := make([]string, 0)
+	replaceValues := make([]string, 0)
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		name := field.Tag.Get("db")
+		if name == "" {
+			continue
+		}
+
+		if field.Tag.Get(insertTag) != "" || field.Tag.Get(updateTag) != "" { // tag field
+			replaceFields = append(replaceFields, name)
+			replaceValues = append(replaceValues, ":"+name)
+		}
+	}
+
+	if len(replaceFields) == 0 {
+		return w.ec.Throw("initReplaceSql", ErrWorkerReplaceFieldNotFind)
+	}
+
+	fieldStr := strings.Join(replaceFields, ",")
+	valueStr := strings.Join(replaceValues, ",")
+	w.replaceSql = "REPLACE INTO " + w.tableName + " (" + fieldStr + ") VALUES (" + valueStr + ")"
+	w.logger.D("Replace SQL: ", w.replaceSql)
 	return nil
 }
 
