@@ -639,22 +639,31 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 		}
 	}
 
-	// conditions
-	if len(condFields) == 0 {
-		return w.ec.Throw("initSelectSql", ErrWorkerKeyFieldNotDefine)
-	}
-
-	condStr := strings.Join(condFields, " AND ")
-
 	// fields
 	fieldStr := ""
-	if len(selectFields) == 0 {
+	selectFieldsLen := len(selectFields)
+	if selectFieldsLen == 0 {
 		fieldStr = "*"
+	} else if selectFieldsLen == 1 {
+		fieldStr = selectFields[0]
 	} else {
 		fieldStr = strings.Join(selectFields, ",")
 	}
 
-	w.selectSql = "SELECT " + fieldStr + " FROM " + w.tableName + " WHERE " + condStr
+	// conditions
+	condStr := ""
+	condFieldsLen := len(condFields)
+	if condFieldsLen == 1 {
+		condStr = condFields[0]
+	} else if condFieldsLen > 1 {
+		condStr = strings.Join(condFields, " AND ")
+	}
+
+	w.selectSql = "SELECT " + fieldStr + " FROM " + w.tableName
+	if condFieldsLen > 0 {
+		w.selectSql += " WHERE " + condStr
+	}
+
 	w.logger.D("Select SQL: ", w.selectSql)
 	return nil
 }
@@ -675,7 +684,6 @@ func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTa
 
 		if field.Tag.Get(updateTag) != "" { // tag field
 			updateFields = append(updateFields, name+"=:"+name)
-			continue
 		}
 
 		if field.Tag.Get(keyTag) != "" { // key field
@@ -683,19 +691,33 @@ func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTa
 		}
 	}
 
-	// conditions
-	if len(condFields) == 0 {
-		return w.ec.Throw("initUpdateSql", ErrWorkerKeyFieldNotDefine)
-	}
-
 	if len(updateFields) == 0 {
 		return w.ec.Throw("initUpdateSql", ErrWorkerKeyFieldNotDefine)
 	}
 
-	condStr := strings.Join(condFields, " AND ")
-	fieldStr := strings.Join(updateFields, ",")
+	// fields
+	fieldStr := ""
+	updateFieldsLen := len(updateFields)
+	if updateFieldsLen == 1 {
+		fieldStr = updateFields[0]
+	} else if updateFieldsLen > 1 {
+		fieldStr = strings.Join(updateFields, ",")
+	}
 
-	w.updateSql = "UPDATE " + w.tableName + " SET " + fieldStr + " WHERE " + condStr
+	// conditions
+	condStr := ""
+	condFieldsLen := len(condFields)
+	if condFieldsLen == 1 {
+		condStr = condFields[0]
+	} else if condFieldsLen > 1 {
+		condStr = strings.Join(condFields, " AND ")
+	}
+
+	w.updateSql = "UPDATE " + w.tableName + " SET " + fieldStr
+	if condFieldsLen > 0 {
+		w.updateSql += " WHERE " + condStr
+	}
+
 	w.logger.D("Update SQL: ", w.updateSql)
 	return nil
 }
