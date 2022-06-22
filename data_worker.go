@@ -110,22 +110,22 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string
 
 	err = w.initInsertSql(rowObj, insertTag)
 	if err != nil {
-		w.ec.Catch("Init", &err)
+		w.logger.W("init insert SQL failed, err: ", err)
 	}
 
 	err = w.initReplaceSql(rowObj, insertTag, updateTag)
 	if err != nil {
-		w.ec.Catch("Init", &err)
+		w.logger.W("init replace SQL failed, err: ", err)
 	}
 
 	err = w.initSelectSql(rowObj, selectTag, selectKeyTag)
 	if err != nil {
-		w.ec.Catch("Init", &err)
+		w.logger.W("init select SQL failed, err: ", err)
 	}
 
 	err = w.initUpdateSql(rowObj, updateTag, updateKeyTag)
 	if err != nil {
-		w.ec.Catch("Init", &err)
+		w.logger.W("init update SQL failed, err: ", err)
 	}
 
 	return nil
