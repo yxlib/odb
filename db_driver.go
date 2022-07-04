@@ -160,3 +160,35 @@ func (d *DbDriver) Exec(query string, args ...interface{}) (sql.Result, error) {
 	r, err := d.db.Exec(query, args...)
 	return r, d.ec.Throw("Exec", err)
 }
+
+func (d *DbDriver) Query(sql string) ([]map[string]string, error) {
+	rows, err := d.db.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+
+	values := make([][]byte, len(cols))
+	scans := make([]interface{}, len(cols))
+
+	for i := range values {
+		scans[i] = &values[i]
+	}
+
+	res := make([]map[string]string, 0)
+	for rows.Next() {
+		_ = rows.Scan(scans...)
+		row := make(map[string]string)
+		for k, v := range values {
+			key := cols[k]
+			row[key] = string(v)
+		}
+
+		res = append(res, row)
+	}
+
+	return res, nil
+}
