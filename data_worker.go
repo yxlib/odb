@@ -192,7 +192,15 @@ func (w *DataWorker) GetAllCacheKeys() ([]string, error) {
 	}
 
 	keys, err := w.cacheDriver.Keys(w.tableName + "_" + "*")
-	return keys, w.ec.Throw("GetAllCacheKeys", err)
+	if err != nil {
+		return nil, w.ec.Throw("GetAllCacheKeys", err)
+	}
+
+	for i := 0; i < len(keys); i++ {
+		keys[i] = w.getKey(keys[i])
+	}
+
+	return keys, nil
 }
 
 func (w *DataWorker) GetCacheData(obj Cacheable, key string, fields ...string) error {
@@ -473,6 +481,17 @@ func (w *DataWorker) SaveCaches() error {
 
 func (w *DataWorker) getCacheKey(key string) string {
 	return w.tableName + "_" + key
+}
+
+func (w *DataWorker) getKey(cacheKey string) string {
+	prefix := w.tableName + "_"
+	idx := strings.Index(cacheKey, prefix)
+	if idx == 0 {
+		prefixLen := len(prefix)
+		return cacheKey[prefixLen:]
+	}
+
+	return ""
 }
 
 func (w *DataWorker) setCacheUpdatedImpl(cacheKey string) {
