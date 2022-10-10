@@ -54,6 +54,10 @@ func (b *builder) Build(dc *DataCenter, cfg *Config) {
 				continue
 			}
 
+			if workerCfg.IsOpenAutoSave {
+				dw.OpenAutoSave()
+			}
+
 			if dw.HasCache() || dw.HasDb() {
 				dc.AddWorker(workerCfg.Tag, dw)
 			}

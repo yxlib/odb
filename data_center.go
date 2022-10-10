@@ -76,7 +76,7 @@ func (c *DataCenter) GetWorker(tag string) (*DataWorker, bool) {
 
 func (c *DataCenter) Start(saveIntv time.Duration, clearExpireIntv time.Duration) {
 	for _, worker := range c.mapTag2Worker {
-		if !worker.HasCache() || !worker.HasDb() {
+		if !worker.HasCache() || !worker.HasDb() || !worker.IsOpenAutoSave() {
 			continue
 		}
 

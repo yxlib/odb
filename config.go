@@ -23,6 +23,7 @@ type DBConf struct {
 
 type WorkerConf struct {
 	Tag                   string            `json:"tag"`
+	IsOpenAutoSave        bool              `json:"is_open_auto_save"`
 	CacheKey              string            `json:"cache_key"`
 	MapCacheField2DbField map[string]string `json:"field_map"`
 	TableName             string            `json:"table_name"`

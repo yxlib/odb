@@ -25,6 +25,7 @@
             [
                 {
                     "tag" : "game_table1",
+                    "is_open_auto_save" : true,
                     "cache_key" : "player_id",
                     "field_map" :
                     {

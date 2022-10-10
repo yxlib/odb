@@ -69,6 +69,7 @@ type DataWorker struct {
 	updateSql             string
 	setUpdatedCacheKeys   *yx.Set
 	lckUpdatedCacheKeys   *sync.Mutex
+	bOpenAutoSave         bool
 	bAutoSave             bool
 	evtStop               *yx.Event
 	evtExit               *yx.Event
@@ -92,6 +93,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2
 		updateSql:             "",
 		setUpdatedCacheKeys:   yx.NewSet(yx.SET_TYPE_OBJ),
 		lckUpdatedCacheKeys:   &sync.Mutex{},
+		bOpenAutoSave:         false,
 		bAutoSave:             false,
 		evtStop:               yx.NewEvent(),
 		evtExit:               yx.NewEvent(),
@@ -148,6 +150,14 @@ func (w *DataWorker) HasCache() bool {
 
 func (w *DataWorker) HasDb() bool {
 	return w.dbDriver != nil
+}
+
+func (w *DataWorker) OpenAutoSave() {
+	w.bOpenAutoSave = true
+}
+
+func (w *DataWorker) IsOpenAutoSave() bool {
+	return w.bOpenAutoSave
 }
 
 func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration) {
