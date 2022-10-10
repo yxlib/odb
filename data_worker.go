@@ -223,6 +223,10 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2
 		ec:                    yx.NewErrCatcher("DataWorker"),
 	}
 
+	if len(w.mapCacheField2DbField) == 0 {
+		w.initCacheField2DbField()
+	}
+
 	for cacheField := range mapCacheField2DbField {
 		w.cacheFields = append(w.cacheFields, cacheField)
 	}
@@ -580,7 +584,8 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	}
 
 	// cache
-	err = w.SetCacheData(rowObj, key, w.cacheFields...)
+	mapField2Val[CACHE_FIELD_UPDATE_TIME] = time.Now().UnixNano()
+	err = w.SetCacheDataByMap(key, mapField2Val)
 	if err != nil {
 		return err
 	}
@@ -620,6 +625,24 @@ func (w *DataWorker) SaveCaches() error {
 	}
 
 	return nil
+}
+
+func (w *DataWorker) initCacheField2DbField() {
+	if w.mapCacheField2DbField == nil {
+		w.mapCacheField2DbField = make(map[string]string)
+	}
+
+	t := reflect.TypeOf(w).Elem()
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		name := field.Tag.Get("db")
+		if name == "" {
+			continue
+		}
+
+		w.mapCacheField2DbField[name] = name
+	}
 }
 
 func (w *DataWorker) getCacheKey(key string) string {
