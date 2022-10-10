@@ -43,6 +43,17 @@ type DBTableRow interface {
 	Cacheable
 }
 
+type BaseDBTableRow struct {
+}
+
+func (u *BaseDBTableRow) FromCache(mapField2Val map[string]string) error {
+	return nil
+}
+
+func (u *BaseDBTableRow) ToCache(fields []string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
 type DataWorker struct {
 	cacheDriver           *CacheDriver
 	mapCacheField2DbField map[string]string
