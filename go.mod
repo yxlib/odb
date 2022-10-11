@@ -8,5 +8,5 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.19.0 // indirect
-	github.com/yxlib/yx v0.2.0
+	github.com/yxlib/yx v0.2.1
 )
