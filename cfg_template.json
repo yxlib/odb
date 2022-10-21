@@ -27,12 +27,6 @@
                     "tag" : "game_table1",
                     "is_open_auto_save" : true,
                     "cache_key" : "player_id",
-                    "field_map" :
-                    {
-                        "player_id" : "player_id",
-                        "cache_field_1" : "db_field_1",
-                        "cache_field_2" : "db_field_2"
-                    },
                     "table_name" : "table1",
                     "row_obj" : "github.com/yxlib/odb.TestTable1Row",
                     "insert_tag" : "insert",

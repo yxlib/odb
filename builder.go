@@ -47,7 +47,7 @@ func (b *builder) Build(dc *DataCenter, cfg *Config) {
 
 		// workers
 		for _, workerCfg := range storageCfg.Workers {
-			dw := NewDataWorker(cd, workerCfg.CacheKey, workerCfg.MapCacheField2DbField, dd, workerCfg.TableName)
+			dw := NewDataWorker(cd, workerCfg.CacheKey, dd, workerCfg.TableName)
 			err = dw.Init(workerCfg.RowObj, workerCfg.InsertTag, workerCfg.SelectTag, workerCfg.SelectKeyTag, workerCfg.UpdateTag, workerCfg.UpdateKeyTag)
 			if err != nil {
 				b.logger.E("init data worker ", workerCfg.TableName, " err: ", err)

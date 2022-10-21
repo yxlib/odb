@@ -61,7 +61,7 @@ func FromCache(r DBTableRow, mapField2Val map[string]string) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		name := field.Tag.Get("db")
+		name := field.Tag.Get("mem")
 		if name == "" {
 			continue
 		}
@@ -127,7 +127,7 @@ func ToCache(r DBTableRow, fields []string) (map[string]interface{}, error) {
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		name := field.Tag.Get("db")
+		name := field.Tag.Get("mem")
 		if name == "" {
 			continue
 		}
@@ -177,59 +177,60 @@ func toCacheValue(value reflect.Value) string {
 }
 
 type DataWorker struct {
-	cacheDriver           *CacheDriver
-	mapCacheField2DbField map[string]string
-	cacheFields           []string
-	cacheKeyName          string
-	dbDriver              *DbDriver
-	tableName             string
-	rowReflectName        string
-	keyField              string
-	insertSql             string
-	replaceSql            string
-	selectSql             string
-	updateSql             string
-	setUpdatedCacheKeys   *yx.Set
-	lckUpdatedCacheKeys   *sync.Mutex
-	bOpenAutoSave         bool
-	bAutoSave             bool
-	evtStop               *yx.Event
-	evtExit               *yx.Event
-	logger                *yx.Logger
-	ec                    *yx.ErrCatcher
+	cacheDriver *CacheDriver
+	// mapCacheField2DbField map[string]string
+	cacheFields         []string
+	cacheKeyName        string
+	dbDriver            *DbDriver
+	tableName           string
+	rowReflectName      string
+	keyField            string
+	insertSql           string
+	replaceSql          string
+	selectSql           string
+	updateSql           string
+	setUpdatedCacheKeys *yx.Set
+	lckUpdatedCacheKeys *sync.Mutex
+	bOpenAutoSave       bool
+	bAutoSave           bool
+	evtStop             *yx.Event
+	evtExit             *yx.Event
+	logger              *yx.Logger
+	ec                  *yx.ErrCatcher
 }
 
-func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, mapCacheField2DbField map[string]string, dbDriver *DbDriver, tableName string) *DataWorker {
+func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDriver, tableName string) *DataWorker {
 	w := &DataWorker{
-		cacheDriver:           cacheDriver,
-		cacheKeyName:          cacheKeyName,
-		mapCacheField2DbField: mapCacheField2DbField,
-		cacheFields:           make([]string, 0),
-		dbDriver:              dbDriver,
-		tableName:             tableName,
-		rowReflectName:        "",
-		keyField:              "",
-		insertSql:             "",
-		replaceSql:            "",
-		selectSql:             "",
-		updateSql:             "",
-		setUpdatedCacheKeys:   yx.NewSet(yx.SET_TYPE_OBJ),
-		lckUpdatedCacheKeys:   &sync.Mutex{},
-		bOpenAutoSave:         false,
-		bAutoSave:             false,
-		evtStop:               yx.NewEvent(),
-		evtExit:               yx.NewEvent(),
-		logger:                yx.NewLogger("DataWorker"),
-		ec:                    yx.NewErrCatcher("DataWorker"),
+		cacheDriver:  cacheDriver,
+		cacheKeyName: cacheKeyName,
+		// mapCacheField2DbField: mapCacheField2DbField,
+		cacheFields:         make([]string, 0),
+		dbDriver:            dbDriver,
+		tableName:           tableName,
+		rowReflectName:      "",
+		keyField:            "",
+		insertSql:           "",
+		replaceSql:          "",
+		selectSql:           "",
+		updateSql:           "",
+		setUpdatedCacheKeys: yx.NewSet(yx.SET_TYPE_OBJ),
+		lckUpdatedCacheKeys: &sync.Mutex{},
+		bOpenAutoSave:       false,
+		bAutoSave:           false,
+		evtStop:             yx.NewEvent(),
+		evtExit:             yx.NewEvent(),
+		logger:              yx.NewLogger("DataWorker"),
+		ec:                  yx.NewErrCatcher("DataWorker"),
 	}
 
-	if len(w.mapCacheField2DbField) == 0 {
-		w.initCacheField2DbField()
-	}
+	w.initCacheFields()
+	// if len(w.mapCacheField2DbField) == 0 {
+	// 	w.initCacheField2DbField()
+	// }
 
-	for cacheField := range mapCacheField2DbField {
-		w.cacheFields = append(w.cacheFields, cacheField)
-	}
+	// for cacheField := range mapCacheField2DbField {
+	// 	w.cacheFields = append(w.cacheFields, cacheField)
+	// }
 
 	return w
 }
@@ -627,23 +628,36 @@ func (w *DataWorker) SaveCaches() error {
 	return nil
 }
 
-func (w *DataWorker) initCacheField2DbField() {
-	if w.mapCacheField2DbField == nil {
-		w.mapCacheField2DbField = make(map[string]string)
-	}
-
+func (w *DataWorker) initCacheFields() {
 	t := reflect.TypeOf(w).Elem()
-
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		name := field.Tag.Get("db")
+		name := field.Tag.Get("mem")
 		if name == "" {
 			continue
 		}
 
-		w.mapCacheField2DbField[name] = name
+		w.cacheFields = append(w.cacheFields, name)
 	}
 }
+
+// func (w *DataWorker) initCacheField2DbField() {
+// 	if w.mapCacheField2DbField == nil {
+// 		w.mapCacheField2DbField = make(map[string]string)
+// 	}
+
+// 	t := reflect.TypeOf(w).Elem()
+
+// 	for i := 0; i < t.NumField(); i++ {
+// 		field := t.Field(i)
+// 		name := field.Tag.Get("db")
+// 		if name == "" {
+// 			continue
+// 		}
+
+// 		w.mapCacheField2DbField[name] = name
+// 	}
+// }
 
 func (w *DataWorker) getCacheKey(key string) string {
 	return w.tableName + "_" + key
