@@ -553,6 +553,22 @@ func (w *DataWorker) GetTableName() string {
 	return w.tableName
 }
 
+func (w *DataWorker) GetInsertSql() string {
+	return w.insertSql
+}
+
+func (w *DataWorker) GetReplaceSql() string {
+	return w.replaceSql
+}
+
+func (w *DataWorker) GetUpdateSql() string {
+	return w.updateSql
+}
+
+func (w *DataWorker) GetSelectSql() string {
+	return w.selectSql
+}
+
 func (w *DataWorker) NameExec(query string, mapper interface{}) error {
 	if !w.HasDb() {
 		return w.ec.Throw("NameExec", ErrNoDb)
