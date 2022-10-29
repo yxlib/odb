@@ -235,7 +235,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDr
 	return w
 }
 
-func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string, selectKeyTag string, updateTag string, updateKeyTag string) error {
+func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string, selectKeyTag string, updateTag string, updateKeyTag string, mapperDbTag string, mapperValTag string) error {
 	var err error = nil
 	defer w.ec.DeferThrow("Init", &err)
 
@@ -258,12 +258,12 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string
 		w.logger.W("init replace SQL failed, err: ", err)
 	}
 
-	err = w.initSelectSql(rowObj, selectTag, selectKeyTag)
+	err = w.initSelectSql(rowObj, selectTag, selectKeyTag, mapperDbTag, mapperValTag)
 	if err != nil {
 		w.logger.W("init select SQL failed, err: ", err)
 	}
 
-	err = w.initUpdateSql(rowObj, updateTag, updateKeyTag)
+	err = w.initUpdateSql(rowObj, updateTag, updateKeyTag, mapperDbTag, mapperValTag)
 	if err != nil {
 		w.logger.W("init update SQL failed, err: ", err)
 	}
@@ -549,6 +549,19 @@ func (w *DataWorker) UpdateToDb(mapper interface{}) error {
 	return w.ec.Throw("UpdateToDb", err)
 }
 
+func (w *DataWorker) GetTableName() string {
+	return w.tableName
+}
+
+func (w *DataWorker) NameExec(query string, mapper interface{}) error {
+	if !w.HasDb() {
+		return w.ec.Throw("NameExec", ErrNoDb)
+	}
+
+	err := w.dbDriver.NameExec(query, mapper)
+	return w.ec.Throw("NameExec", err)
+}
+
 func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	var err error = nil
 	defer w.ec.DeferThrow("PreloadData", &err)
@@ -817,7 +830,7 @@ func (w *DataWorker) initReplaceSql(tableObj interface{}, insertTag string, upda
 	return nil
 }
 
-func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTag string) error {
+func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTag string, mapperDbTag string, mapperValTag string) error {
 	v := reflect.TypeOf(tableObj).Elem()
 
 	selectFields := make([]string, 0)
@@ -825,16 +838,20 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
-		if name == "" {
-			continue
-		}
-
-		if field.Tag.Get(selectTag) != "" { // tag field
-			selectFields = append(selectFields, name)
+		if name != "" {
+			if field.Tag.Get(selectTag) != "" { // tag field
+				selectFields = append(selectFields, name)
+			}
 		}
 
 		if field.Tag.Get(keyTag) != "" { // key field
-			condFields = append(condFields, name+"=:"+name)
+			dbName := field.Tag.Get(mapperDbTag)
+			valName := field.Tag.Get(mapperValTag)
+			if dbName != "" && valName != "" {
+				condFields = append(condFields, dbName+"=:"+valName)
+			} else if name != "" {
+				condFields = append(condFields, name+"=:"+name)
+			}
 		}
 	}
 
@@ -867,7 +884,7 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 	return nil
 }
 
-func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTag string) error {
+func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTag string, mapperDbTag string, mapperValTag string) error {
 	v := reflect.TypeOf(tableObj).Elem()
 	// sql := ""
 	// keyField := ""
@@ -877,16 +894,21 @@ func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTa
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
-		if name == "" {
-			continue
-		}
 
-		if field.Tag.Get(updateTag) != "" { // tag field
-			updateFields = append(updateFields, name+"=:"+name)
+		if name != "" {
+			if field.Tag.Get(updateTag) != "" { // tag field
+				updateFields = append(updateFields, name+"=:"+name)
+			}
 		}
 
 		if field.Tag.Get(keyTag) != "" { // key field
-			condFields = append(condFields, name+"=:"+name)
+			dbName := field.Tag.Get(mapperDbTag)
+			valName := field.Tag.Get(mapperValTag)
+			if dbName != "" && valName != "" {
+				condFields = append(condFields, dbName+"=:"+valName)
+			} else if name != "" {
+				condFields = append(condFields, name+"=:"+name)
+			}
 		}
 	}
 

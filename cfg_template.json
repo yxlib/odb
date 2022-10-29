@@ -33,7 +33,9 @@
                     "select_tag" : "select",
                     "select_key_tag" : "select_key",
                     "update_tag" : "update",
-                    "update_key_tag" : "update_key"
+                    "update_key_tag" : "update_key",
+                    "mapper_db_tag" : "mapper_db",
+                    "mapper_val_tag" : "mapper_val"
                 }
             ]
         }
