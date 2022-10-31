@@ -33,8 +33,6 @@ type WorkerConf struct {
 	SelectKeyTag          string            `json:"select_key_tag"`
 	UpdateTag             string            `json:"update_tag"`
 	UpdateKeyTag          string            `json:"update_key_tag"`
-	MapperDbTag           string            `json:"mapper_db_tag"`
-	MapperValTag          string            `json:"mapper_val_tag"`
 }
 
 type StorageConf struct {
