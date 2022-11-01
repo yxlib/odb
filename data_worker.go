@@ -790,21 +790,7 @@ func (w *DataWorker) saveCache(cacheKey string) error {
 
 func (w *DataWorker) initInsertSql(tableObj interface{}, insertTag string) error {
 	v := reflect.TypeOf(tableObj).Elem()
-
-	insertFields := make([]string, 0)
-	insertValues := make([]string, 0)
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		name := field.Tag.Get("db")
-		if name == "" {
-			continue
-		}
-
-		if field.Tag.Get(insertTag) != "" { // tag field
-			insertFields = append(insertFields, name)
-			insertValues = append(insertValues, ":"+name)
-		}
-	}
+	insertFields, insertValues := w.getInsertFieldValues(v, insertTag)
 
 	if len(insertFields) == 0 {
 		return w.ec.Throw("initInsertSql", ErrWorkerInsertFieldNotFind)
@@ -817,23 +803,36 @@ func (w *DataWorker) initInsertSql(tableObj interface{}, insertTag string) error
 	return nil
 }
 
-func (w *DataWorker) initReplaceSql(tableObj interface{}, insertTag string, updateTag string) error {
-	v := reflect.TypeOf(tableObj).Elem()
+func (w *DataWorker) getInsertFieldValues(v reflect.Type, insertTag string) ([]string, []string) {
+	fields := make([]string, 0)
+	values := make([]string, 0)
 
-	replaceFields := make([]string, 0)
-	replaceValues := make([]string, 0)
+	if v.Kind() != reflect.Struct {
+		return fields, values
+	}
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
 		if name == "" {
+			superFields, superValues := w.getInsertFieldValues(field.Type, insertTag)
+			fields = append(fields, superFields...)
+			values = append(values, superValues...)
 			continue
 		}
 
-		if field.Tag.Get(insertTag) != "" || field.Tag.Get(updateTag) != "" { // tag field
-			replaceFields = append(replaceFields, name)
-			replaceValues = append(replaceValues, ":"+name)
+		if field.Tag.Get(insertTag) != "" { // tag field
+			fields = append(fields, name)
+			values = append(values, ":"+name)
 		}
 	}
+
+	return fields, values
+}
+
+func (w *DataWorker) initReplaceSql(tableObj interface{}, insertTag string, updateTag string) error {
+	v := reflect.TypeOf(tableObj).Elem()
+	replaceFields, replaceValues := w.getReplaceFieldValues(v, insertTag, updateTag)
 
 	if len(replaceFields) == 0 {
 		return w.ec.Throw("initReplaceSql", ErrWorkerReplaceFieldNotFind)
@@ -846,26 +845,36 @@ func (w *DataWorker) initReplaceSql(tableObj interface{}, insertTag string, upda
 	return nil
 }
 
-func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTag string) error {
-	v := reflect.TypeOf(tableObj).Elem()
+func (w *DataWorker) getReplaceFieldValues(v reflect.Type, insertTag string, updateTag string) ([]string, []string) {
+	fields := make([]string, 0)
+	values := make([]string, 0)
 
-	selectFields := make([]string, 0)
-	condFields := make([]string, 0)
+	if v.Kind() != reflect.Struct {
+		return fields, values
+	}
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
 		if name == "" {
+			superFields, superValues := w.getReplaceFieldValues(field.Type, insertTag, updateTag)
+			fields = append(fields, superFields...)
+			values = append(values, superValues...)
 			continue
 		}
 
-		if field.Tag.Get(selectTag) != "" { // tag field
-			selectFields = append(selectFields, name)
-		}
-
-		if field.Tag.Get(keyTag) != "" { // key field
-			condFields = append(condFields, name+"=:"+name)
+		if field.Tag.Get(insertTag) != "" || field.Tag.Get(updateTag) != "" { // tag field
+			fields = append(fields, name)
+			values = append(values, ":"+name)
 		}
 	}
+
+	return fields, values
+}
+
+func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTag string) error {
+	v := reflect.TypeOf(tableObj).Elem()
+	selectFields, condFields := w.getSelectFields(v, selectTag, keyTag)
 
 	// fields
 	fieldStr := ""
@@ -896,28 +905,42 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 	return nil
 }
 
-func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTag string) error {
-	v := reflect.TypeOf(tableObj).Elem()
-	// sql := ""
-	// keyField := ""
-
-	updateFields := make([]string, 0)
+func (w *DataWorker) getSelectFields(v reflect.Type, selectTag string, keyTag string) ([]string, []string) {
+	selectFields := make([]string, 0)
 	condFields := make([]string, 0)
+
+	if v.Kind() != reflect.Struct {
+		return selectFields, condFields
+	}
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		name := field.Tag.Get("db")
 		if name == "" {
+			superSelectFields, superCondFields := w.getSelectFields(field.Type, selectTag, keyTag)
+			selectFields = append(selectFields, superSelectFields...)
+			condFields = append(condFields, superCondFields...)
 			continue
 		}
 
-		if field.Tag.Get(updateTag) != "" { // tag field
-			updateFields = append(updateFields, name+"=:"+name)
+		if field.Tag.Get(selectTag) != "" { // tag field
+			selectFields = append(selectFields, name)
 		}
 
 		if field.Tag.Get(keyTag) != "" { // key field
 			condFields = append(condFields, name+"=:"+name)
 		}
 	}
+
+	return selectFields, condFields
+}
+
+func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTag string) error {
+	v := reflect.TypeOf(tableObj).Elem()
+	updateFields, condFields := w.getUpdateFields(v, updateTag, keyTag)
+
+	// sql := ""
+	// keyField := ""
 
 	if len(updateFields) == 0 {
 		return w.ec.Throw("initUpdateSql", ErrWorkerKeyFieldNotDefine)
@@ -948,6 +971,36 @@ func (w *DataWorker) initUpdateSql(tableObj interface{}, updateTag string, keyTa
 
 	w.logger.D("Update SQL: ", w.updateSql)
 	return nil
+}
+
+func (w *DataWorker) getUpdateFields(v reflect.Type, updateTag string, keyTag string) ([]string, []string) {
+	updateFields := make([]string, 0)
+	condFields := make([]string, 0)
+
+	if v.Kind() != reflect.Struct {
+		return updateFields, condFields
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		name := field.Tag.Get("db")
+		if name == "" {
+			superUpdateFields, superCondFields := w.getUpdateFields(field.Type, updateTag, keyTag)
+			updateFields = append(updateFields, superUpdateFields...)
+			condFields = append(condFields, superCondFields...)
+			continue
+		}
+
+		if field.Tag.Get(updateTag) != "" { // tag field
+			updateFields = append(updateFields, name+"=:"+name)
+		}
+
+		if field.Tag.Get(keyTag) != "" { // key field
+			condFields = append(condFields, name+"=:"+name)
+		}
+	}
+
+	return updateFields, condFields
 }
 
 func (w *DataWorker) selectImpl(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
