@@ -426,7 +426,8 @@ func (w *DataWorker) SetCacheData(obj Cacheable, key string, fields ...string) e
 		return err
 	}
 
-	mapField2Val[CACHE_FIELD_UPDATE_TIME] = time.Now().UnixNano()
+	updateTime := time.Now().UnixNano()
+	mapField2Val[CACHE_FIELD_UPDATE_TIME] = strconv.FormatInt(updateTime, 10)
 	err = w.SetCacheDataByMap(key, mapField2Val)
 	return err
 }
@@ -614,7 +615,8 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	}
 
 	// cache
-	mapField2Val[CACHE_FIELD_UPDATE_TIME] = time.Now().UnixNano()
+	updateTime := time.Now().UnixNano()
+	mapField2Val[CACHE_FIELD_UPDATE_TIME] = strconv.FormatInt(updateTime, 10)
 	err = w.SetCacheDataByMap(key, mapField2Val)
 	if err != nil {
 		return err
