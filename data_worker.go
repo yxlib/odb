@@ -570,14 +570,18 @@ func (w *DataWorker) GetSelectSql() string {
 	return w.selectSql
 }
 
-func (w *DataWorker) NameExec(query string, mapper interface{}) error {
-	if !w.HasDb() {
-		return w.ec.Throw("NameExec", ErrNoDb)
-	}
-
-	err := w.dbDriver.NameExec(query, mapper)
-	return w.ec.Throw("NameExec", err)
+func (w *DataWorker) GetDbDriver() (*DbDriver, bool) {
+	return w.dbDriver, (w.dbDriver != nil)
 }
+
+// func (w *DataWorker) NameExec(query string, mapper interface{}) error {
+// 	if !w.HasDb() {
+// 		return w.ec.Throw("NameExec", ErrNoDb)
+// 	}
+
+// 	err := w.dbDriver.NameExec(query, mapper)
+// 	return w.ec.Throw("NameExec", err)
+// }
 
 func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	var err error = nil
