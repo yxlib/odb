@@ -35,6 +35,14 @@ const (
 	CACHE_FIELD_UPDATE_TIME = "cache_update_time"
 )
 
+const (
+	INSERT_TAG_DEFAULT     = "insert"
+	SELECT_TAG_DEFAULT     = "select"
+	SELECT_KEY_TAG_DEFAULT = "select_key"
+	UPDATE_TAG_DEFAULT     = "update"
+	UPDATE_KEY_TAG_DEFAULT = "update_key"
+)
+
 type Cacheable interface {
 	FromCache(mapField2Val map[string]string) error
 	ToCache(fields []string) (map[string]interface{}, error)
@@ -239,6 +247,28 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string
 	var err error = nil
 	defer w.ec.DeferThrow("Init", &err)
 
+	// fix tag
+	if len(insertTag) == 0 {
+		insertTag = INSERT_TAG_DEFAULT
+	}
+
+	if len(selectTag) == 0 {
+		selectTag = SELECT_TAG_DEFAULT
+	}
+
+	if len(selectKeyTag) == 0 {
+		selectKeyTag = SELECT_KEY_TAG_DEFAULT
+	}
+
+	if len(updateTag) == 0 {
+		updateTag = UPDATE_TAG_DEFAULT
+	}
+
+	if len(updateKeyTag) == 0 {
+		updateKeyTag = UPDATE_KEY_TAG_DEFAULT
+	}
+
+	// init sql
 	w.rowReflectName = reflectName
 
 	rowObj, err := w.dbDriver.CreateTableRow(reflectName)
