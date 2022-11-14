@@ -532,17 +532,17 @@ func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
 	return lastId, nil
 }
 
-func (w *DataWorker) ReplaceToDb(mapper interface{}) error {
+func (w *DataWorker) ReplaceToDb(mapper interface{}) (int64, error) {
 	if !w.HasDb() {
-		return w.ec.Throw("ReplaceToDb", ErrNoDb)
+		return 0, w.ec.Throw("ReplaceToDb", ErrNoDb)
 	}
 
-	err := w.dbDriver.NameExec(w.replaceSql, mapper)
+	effectRow, err := w.dbDriver.NameExec(w.replaceSql, mapper)
 	if err != nil {
-		return w.ec.Throw("ReplaceToDb", err)
+		return 0, w.ec.Throw("ReplaceToDb", err)
 	}
 
-	return nil
+	return effectRow, nil
 }
 
 func (w *DataWorker) SelectRowsFromDb(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
@@ -571,13 +571,13 @@ func (w *DataWorker) SelectFromDb(mapper interface{}) (DBTableRow, error) {
 	return rows[0], nil
 }
 
-func (w *DataWorker) UpdateToDb(mapper interface{}) error {
+func (w *DataWorker) UpdateToDb(mapper interface{}) (int64, error) {
 	if !w.HasDb() {
-		return w.ec.Throw("UpdateToDb", ErrNoDb)
+		return 0, w.ec.Throw("UpdateToDb", ErrNoDb)
 	}
 
-	err := w.dbDriver.NameExec(w.updateSql, mapper)
-	return w.ec.Throw("UpdateToDb", err)
+	effectRow, err := w.dbDriver.NameExec(w.updateSql, mapper)
+	return effectRow, w.ec.Throw("UpdateToDb", err)
 }
 
 func (w *DataWorker) GetTableName() string {
@@ -820,7 +820,7 @@ func (w *DataWorker) saveCache(cacheKey string) error {
 		return err
 	}
 
-	err = w.UpdateToDb(rowObj)
+	_, err = w.UpdateToDb(rowObj)
 	return err
 }
 

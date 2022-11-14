@@ -93,9 +93,18 @@ func (d *DbDriver) ReuseTableRow(rowObj DBTableRow, rowReflectName string) {
 	d.factory.ReuseObject(rowObj, rowReflectName)
 }
 
-func (d *DbDriver) NameExec(query string, mapper interface{}) error {
-	_, err := d.db.NamedExec(query, mapper)
-	return d.ec.Throw("NameExec", err)
+func (d *DbDriver) NameExec(query string, mapper interface{}) (int64, error) {
+	result, err := d.db.NamedExec(query, mapper)
+	if err != nil {
+		return 0, d.ec.Throw("NameExec", err)
+	}
+
+	effectRow, err := result.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+
+	return effectRow, nil
 }
 
 func (d *DbDriver) NameInsert(query string, mapper interface{}) (int64, error) {
