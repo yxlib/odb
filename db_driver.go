@@ -201,3 +201,15 @@ func (d *DbDriver) Query(sql string) ([]map[string]string, error) {
 
 	return res, nil
 }
+
+func (d *DbDriver) Begin() (*sql.Tx, error) {
+	return d.db.Begin()
+}
+
+func (d *DbDriver) Commit(tx *sql.Tx) error {
+	return tx.Commit()
+}
+
+func (d *DbDriver) Rollback(tx *sql.Tx) error {
+	return tx.Rollback()
+}
