@@ -29,6 +29,7 @@ var (
 	ErrWorkerFieldNotExist       = errors.New("some field not exist")
 	ErrWorkerCacheKeyNotFind     = errors.New("cache key not define")
 	ErrWorkerCacheKeyNotString   = errors.New("cache key not string")
+	ErrWorkerDBCountUnknownErr   = errors.New("unknown error while count")
 )
 
 const (
@@ -184,6 +185,12 @@ func toCacheValue(value reflect.Value) string {
 	return ""
 }
 
+type CountRow struct {
+	BaseDBTableRow
+
+	Count int64 `db:"count"`
+}
+
 type DataWorker struct {
 	cacheDriver *CacheDriver
 	// mapCacheField2DbField map[string]string
@@ -192,10 +199,12 @@ type DataWorker struct {
 	dbDriver            *DbDriver
 	tableName           string
 	rowReflectName      string
+	cntRowReflectName   string
 	keyField            string
 	insertSql           string
 	replaceSql          string
 	selectSql           string
+	countSql            string
 	updateSql           string
 	setUpdatedCacheKeys *yx.Set
 	lckUpdatedCacheKeys *sync.Mutex
@@ -216,10 +225,12 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDr
 		dbDriver:            dbDriver,
 		tableName:           tableName,
 		rowReflectName:      "",
+		cntRowReflectName:   "",
 		keyField:            "",
 		insertSql:           "",
 		replaceSql:          "",
 		selectSql:           "",
+		countSql:            "",
 		updateSql:           "",
 		setUpdatedCacheKeys: yx.NewSet(yx.SET_TYPE_OBJ),
 		lckUpdatedCacheKeys: &sync.Mutex{},
@@ -520,11 +531,20 @@ func (w *DataWorker) ClearExpireCaches() error {
 }
 
 func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
+	return w.InsertToDbEx(mapper, "")
+}
+
+func (w *DataWorker) InsertToDbEx(mapper interface{}, extraCond string) (int64, error) {
 	if !w.HasDb() {
-		return 0, w.ec.Throw("InsertToDb", ErrNoDb)
+		return 0, w.ec.Throw("InsertToDbEx", ErrNoDb)
 	}
 
-	lastId, err := w.dbDriver.NameInsert(w.insertSql, mapper)
+	insertSql := w.insertSql
+	if len(extraCond) > 0 {
+		insertSql = insertSql + extraCond
+	}
+
+	lastId, err := w.dbDriver.NameInsert(insertSql, mapper)
 	if err != nil {
 		return 0, w.ec.Throw("InsertToDb", err)
 	}
@@ -533,11 +553,20 @@ func (w *DataWorker) InsertToDb(mapper interface{}) (int64, error) {
 }
 
 func (w *DataWorker) ReplaceToDb(mapper interface{}) (int64, error) {
+	return w.ReplaceToDbEx(mapper, "")
+}
+
+func (w *DataWorker) ReplaceToDbEx(mapper interface{}, extraCond string) (int64, error) {
 	if !w.HasDb() {
-		return 0, w.ec.Throw("ReplaceToDb", ErrNoDb)
+		return 0, w.ec.Throw("ReplaceToDbEx", ErrNoDb)
 	}
 
-	effectRow, err := w.dbDriver.NameExec(w.replaceSql, mapper)
+	replaceSql := w.replaceSql
+	if len(extraCond) > 0 {
+		replaceSql = replaceSql + extraCond
+	}
+
+	effectRow, err := w.dbDriver.NameExec(replaceSql, mapper)
 	if err != nil {
 		return 0, w.ec.Throw("ReplaceToDb", err)
 	}
@@ -546,37 +575,85 @@ func (w *DataWorker) ReplaceToDb(mapper interface{}) (int64, error) {
 }
 
 func (w *DataWorker) SelectRowsFromDb(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
+	return w.SelectRowsFromDbEx(mapper, "", limitCnt)
+}
+
+func (w *DataWorker) SelectRowsFromDbEx(mapper interface{}, extraCond string, limitCnt int) ([]DBTableRow, error) {
 	if !w.HasDb() {
-		return nil, w.ec.Throw("SelectRowsFromDb", ErrNoDb)
+		return nil, w.ec.Throw("SelectRowsFromDbEx", ErrNoDb)
 	}
 
-	rows, err := w.selectImpl(mapper, limitCnt)
+	rows, err := w.selectImpl(mapper, extraCond, limitCnt)
 	return rows, w.ec.Throw("SelectRowsFromDb", err)
 }
 
 func (w *DataWorker) SelectFromDb(mapper interface{}) (DBTableRow, error) {
+	return w.SelectFromDbEx(mapper, "")
+}
+
+func (w *DataWorker) SelectFromDbEx(mapper interface{}, extraCond string) (DBTableRow, error) {
 	if !w.HasDb() {
-		return nil, w.ec.Throw("SelectFromDb", ErrNoDb)
+		return nil, w.ec.Throw("SelectFromDbEx", ErrNoDb)
 	}
 
-	rows, err := w.selectImpl(mapper, 1)
+	rows, err := w.selectImpl(mapper, extraCond, 1)
 	if err != nil {
-		return nil, w.ec.Throw("SelectFromDb", err)
+		return nil, w.ec.Throw("SelectFromDbEx", err)
 	}
 
 	if len(rows) == 0 {
-		return nil, w.ec.Throw("SelectFromDb", ErrWorkerDBNotExist)
+		return nil, w.ec.Throw("SelectFromDbEx", ErrWorkerDBNotExist)
 	}
 
 	return rows[0], nil
 }
 
-func (w *DataWorker) UpdateToDb(mapper interface{}) (int64, error) {
+func (w *DataWorker) Count(mapper interface{}) (int64, error) {
+	return w.CountEx(mapper, "")
+}
+
+func (w *DataWorker) CountEx(mapper interface{}, extraCond string) (int64, error) {
 	if !w.HasDb() {
-		return 0, w.ec.Throw("UpdateToDb", ErrNoDb)
+		return 0, w.ec.Throw("CountEx", ErrNoDb)
 	}
 
-	effectRow, err := w.dbDriver.NameExec(w.updateSql, mapper)
+	countSql := w.countSql
+	if len(extraCond) > 0 {
+		countSql = countSql + extraCond
+	}
+
+	rows, err := w.dbDriver.NameQuery(w.cntRowReflectName, countSql, mapper)
+	if err != nil {
+		return 0, w.ec.Throw("CountEx", err)
+	}
+
+	if len(rows) == 0 {
+		return 0, w.ec.Throw("CountEx", ErrWorkerDBNotExist)
+	}
+
+	rowObj, ok := rows[0].(*CountRow)
+	if !ok {
+		return 0, ErrWorkerDBCountUnknownErr
+	}
+
+	return rowObj.Count, nil
+}
+
+func (w *DataWorker) UpdateToDb(mapper interface{}) (int64, error) {
+	return w.UpdateToDbEx(mapper, "")
+}
+
+func (w *DataWorker) UpdateToDbEx(mapper interface{}, extraCond string) (int64, error) {
+	if !w.HasDb() {
+		return 0, w.ec.Throw("UpdateToDbEx", ErrNoDb)
+	}
+
+	updateSql := w.updateSql
+	if len(extraCond) > 0 {
+		updateSql = updateSql + extraCond
+	}
+
+	effectRow, err := w.dbDriver.NameExec(updateSql, mapper)
 	return effectRow, w.ec.Throw("UpdateToDb", err)
 }
 
@@ -933,11 +1010,21 @@ func (w *DataWorker) initSelectSql(tableObj interface{}, selectTag string, keyTa
 	}
 
 	w.selectSql = "SELECT " + fieldStr + " FROM " + w.tableName
+	w.countSql = "SELECT COUNT(*) AS count FROM " + w.tableName
 	if condFieldsLen > 0 {
 		w.selectSql += " WHERE " + condStr
+		w.countSql += " WHERE " + condStr
 	}
 
+	refName, err := RowObjFactory.RegisterObject(&CountRow{}, nil, 10)
+	if err != nil {
+		return err
+	}
+
+	w.cntRowReflectName = refName
+
 	w.logger.D("Select SQL: ", w.selectSql)
+	w.logger.D("Count SQL: ", w.countSql)
 	return nil
 }
 
@@ -1039,13 +1126,17 @@ func (w *DataWorker) getUpdateFields(v reflect.Type, updateTag string, keyTag st
 	return updateFields, condFields
 }
 
-func (w *DataWorker) selectImpl(mapper interface{}, limitCnt int) ([]DBTableRow, error) {
+func (w *DataWorker) selectImpl(mapper interface{}, extraCond string, limitCnt int) ([]DBTableRow, error) {
 	var err error = nil
 	defer w.ec.DeferThrow("selectImpl", &err)
 
 	selectSql := w.selectSql
+	if len(extraCond) > 0 {
+		selectSql = selectSql + extraCond
+	}
+
 	if limitCnt > 0 {
-		selectSql = fmt.Sprintf("%s LIMIT %d", w.selectSql, limitCnt)
+		selectSql = fmt.Sprintf("%s LIMIT %d", selectSql, limitCnt)
 	}
 
 	rows, err := w.dbDriver.NameQuery(w.rowReflectName, selectSql, mapper)
