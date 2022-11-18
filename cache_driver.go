@@ -230,3 +230,7 @@ func (d *CacheDriver) Keys(pattern string) ([]string, error) {
 	keys, err := d.db.Keys(pattern).Result()
 	return keys, d.ec.Throw("Keys", err)
 }
+
+func (d *CacheDriver) GetDB() *redis.Client {
+	return d.db
+}

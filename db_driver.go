@@ -213,3 +213,7 @@ func (d *DbDriver) Commit(tx *sql.Tx) error {
 func (d *DbDriver) Rollback(tx *sql.Tx) error {
 	return tx.Rollback()
 }
+
+func (d *DbDriver) GetDB() *sqlx.DB {
+	return d.db
+}
