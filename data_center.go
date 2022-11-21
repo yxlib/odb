@@ -208,6 +208,44 @@ func (c *DataCenter) UpdateToDb(tag string, mapper interface{}, extraCond string
 	return nil
 }
 
+func (c *DataCenter) NameExec(dbTag string, query string, mapper interface{}) error {
+	dbDriver, ok := c.GetDbDriver(dbTag)
+	if !ok {
+		return ErrNoDbDriver
+	}
+
+	affectRow, err := dbDriver.NameExec(query, mapper)
+	if err != nil {
+		return err
+	}
+
+	if affectRow == 0 {
+		return ErrAffectRowZero
+	}
+
+	return nil
+}
+
+func (c *DataCenter) NameInsert(dbTag string, query string, mapper interface{}) (int64, error) {
+	dbDriver, ok := c.GetDbDriver(dbTag)
+	if !ok {
+		return 0, ErrNoDbDriver
+	}
+
+	tid, err := dbDriver.NameInsert(query, mapper)
+	return tid, err
+}
+
+func (c *DataCenter) NameQuery(dbTag string, rowReflectName string, query string, mapper interface{}) ([]DBTableRow, error) {
+	dbDriver, ok := c.GetDbDriver(dbTag)
+	if !ok {
+		return nil, ErrNoDbDriver
+	}
+
+	rows, err := dbDriver.NameQuery(rowReflectName, query, mapper)
+	return rows, err
+}
+
 func (c *DataCenter) BeginTransaction(dbTag string) (*sql.Tx, error) {
 	dbDriver, ok := c.GetDbDriver(dbTag)
 	if !ok {
