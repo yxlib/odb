@@ -206,13 +206,13 @@ func (d *DbDriver) Begin() (*sql.Tx, error) {
 	return d.db.Begin()
 }
 
-func (d *DbDriver) Commit(tx *sql.Tx) error {
-	return tx.Commit()
-}
+// func (d *DbDriver) Commit(tx *sql.Tx) error {
+// 	return tx.Commit()
+// }
 
-func (d *DbDriver) Rollback(tx *sql.Tx) error {
-	return tx.Rollback()
-}
+// func (d *DbDriver) Rollback(tx *sql.Tx) error {
+// 	return tx.Rollback()
+// }
 
 func (d *DbDriver) GetDB() *sqlx.DB {
 	return d.db
