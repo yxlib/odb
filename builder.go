@@ -47,10 +47,13 @@ func (b *builder) Build(dc *DataCenter, cfg *Config) {
 
 		// workers
 		for _, workerCfg := range storageCfg.Workers {
+			b.logger.I("=====> Init Data Worker [[", workerCfg.TableName, ".", workerCfg.Tag, "]] ...")
+
 			dw := NewDataWorker(cd, workerCfg.CacheKey, dd, workerCfg.TableName)
 			err = dw.Init(workerCfg.RowObj, workerCfg.InsertTag, workerCfg.SelectTag, workerCfg.SelectKeyTag, workerCfg.UpdateTag, workerCfg.UpdateKeyTag)
 			if err != nil {
-				b.logger.E("init data worker ", workerCfg.TableName, " err: ", err)
+				b.logger.E("init data worker ", workerCfg.TableName, ".", workerCfg.Tag, " err: ", err)
+				b.logger.I("=====> Failed")
 				continue
 			}
 
@@ -61,6 +64,8 @@ func (b *builder) Build(dc *DataCenter, cfg *Config) {
 			if dw.HasCache() || dw.HasDb() {
 				dc.AddWorker(workerCfg.Tag, dw)
 			}
+
+			b.logger.I("=====> Success")
 		}
 	}
 }
