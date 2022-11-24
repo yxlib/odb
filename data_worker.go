@@ -665,16 +665,32 @@ func (w *DataWorker) GetInsertSql() string {
 	return w.insertSql
 }
 
+func (w *DataWorker) SetInsertSql(insertSql string) {
+	w.insertSql = insertSql
+}
+
 func (w *DataWorker) GetReplaceSql() string {
 	return w.replaceSql
+}
+
+func (w *DataWorker) SetReplaceSql(replaceSql string) {
+	w.replaceSql = replaceSql
 }
 
 func (w *DataWorker) GetUpdateSql() string {
 	return w.updateSql
 }
 
+func (w *DataWorker) SetUpdateSql(updateSql string) {
+	w.updateSql = updateSql
+}
+
 func (w *DataWorker) GetSelectSql() string {
 	return w.selectSql
+}
+
+func (w *DataWorker) SetSelectSql(selectSql string) {
+	w.selectSql = selectSql
 }
 
 func (w *DataWorker) GetDbDriver() (*DbDriver, bool) {
