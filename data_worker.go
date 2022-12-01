@@ -1143,8 +1143,8 @@ func (w *DataWorker) getUpdateFields(v reflect.Type, updateTag string, keyTag st
 }
 
 func (w *DataWorker) selectImpl(mapper interface{}, extraCond string, limitCnt int) ([]DBTableRow, error) {
-	var err error = nil
-	defer w.ec.DeferThrow("selectImpl", &err)
+	// var err error = nil
+	// defer w.ec.DeferThrow("selectImpl", &err)
 
 	selectSql := w.selectSql
 	if len(extraCond) > 0 {
