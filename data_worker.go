@@ -59,7 +59,7 @@ type DataWorker struct {
 	selectSql           string
 	countSql            string
 	updateSql           string
-	setUpdatedCacheKeys *yx.Set
+	setUpdatedCacheKeys *yx.ObjectSet
 	lckUpdatedCacheKeys *sync.Mutex
 	bOpenAutoSave       bool
 	bAutoSave           bool
@@ -85,7 +85,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDr
 		selectSql:           "",
 		countSql:            "",
 		updateSql:           "",
-		setUpdatedCacheKeys: yx.NewSet(yx.SET_TYPE_OBJ),
+		setUpdatedCacheKeys: yx.NewObjectSet(),
 		lckUpdatedCacheKeys: &sync.Mutex{},
 		bOpenAutoSave:       false,
 		bAutoSave:           false,
@@ -187,6 +187,7 @@ func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration
 	w.bAutoSave = true
 	saveTicker := time.NewTicker(saveIntv)
 	clearExpireTick := time.NewTicker(clearExpireIntv)
+	stopChan := w.evtStop.GetChan()
 
 	for {
 		select {
@@ -196,7 +197,7 @@ func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration
 		case <-saveTicker.C:
 			w.SaveCaches()
 
-		case <-w.evtStop.C:
+		case <-stopChan:
 			w.SaveCaches()
 			goto Exit0
 		}
@@ -205,7 +206,7 @@ func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration
 Exit0:
 	saveTicker.Stop()
 	clearExpireTick.Stop()
-	w.evtExit.Send()
+	w.evtExit.Close()
 	w.bAutoSave = false
 }
 
@@ -214,7 +215,7 @@ func (w *DataWorker) Stop() {
 		return
 	}
 
-	w.evtStop.Send()
+	w.evtStop.Close()
 	w.evtExit.Wait()
 }
 
@@ -722,7 +723,7 @@ func (w *DataWorker) popUpdatedCacheKeys() []string {
 	defer w.lckUpdatedCacheKeys.Unlock()
 
 	cacheKeys := w.setUpdatedCacheKeys.GetElements()
-	w.setUpdatedCacheKeys = yx.NewSet(yx.SET_TYPE_OBJ)
+	w.setUpdatedCacheKeys = yx.NewObjectSet()
 
 	updatedCacheKeys := make([]string, 0, len(cacheKeys))
 	for _, key := range cacheKeys {

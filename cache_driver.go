@@ -61,7 +61,7 @@ func (d *CacheDriver) Close() error {
 		return nil
 	}
 
-	d.evtNotifyExit.Send()
+	d.evtNotifyExit.Close()
 	err := d.db.Close()
 	return d.ec.Throw("Close", err)
 }
@@ -82,10 +82,11 @@ func (d *CacheDriver) Subscribe(cb RedisSubscribeCb, channels ...string) error {
 	}
 
 	ch := pubsub.Channel()
+	exitChan := d.evtNotifyExit.GetChan()
 
 	for {
 		select {
-		case <-d.evtNotifyExit.C:
+		case <-exitChan:
 			goto Exit0
 
 		case msg := <-ch:
@@ -94,7 +95,7 @@ func (d *CacheDriver) Subscribe(cb RedisSubscribeCb, channels ...string) error {
 	}
 
 Exit0:
-	d.evtExit.Send()
+	d.evtExit.Close()
 	return nil
 }
 

@@ -20,7 +20,7 @@ func GenRowObjRegisterFileByCfg(cfg *Config, regFilePath string, regPackName str
 
 	writePackage(f, regPackName)
 
-	rowObjClasses := yx.NewSet(yx.SET_TYPE_OBJ)
+	rowObjClasses := yx.NewObjectSet()
 	for _, storageCfg := range cfg.Storages {
 		for _, workerCfg := range storageCfg.Workers {
 			rowObjClasses.Add(workerCfg.RowObj)
@@ -37,10 +37,10 @@ func writePackage(f *os.File, regPackName string) {
 	f.WriteString("package " + regPackName + "\n\n")
 }
 
-func writeImport(rowObjClasses *yx.Set, regPackName string, f *os.File) {
+func writeImport(rowObjClasses *yx.ObjectSet, regPackName string, f *os.File) {
 	f.WriteString("import (\n")
 
-	packSet := yx.NewSet(yx.SET_TYPE_OBJ)
+	packSet := yx.NewObjectSet()
 	packSet.Add("github.com/yxlib/odb")
 
 	classNames := rowObjClasses.GetElements()
@@ -56,7 +56,7 @@ func writeImport(rowObjClasses *yx.Set, regPackName string, f *os.File) {
 	f.WriteString(")\n\n")
 }
 
-func addRowClassPackage(className string, regPackName string, packSet *yx.Set) {
+func addRowClassPackage(className string, regPackName string, packSet *yx.ObjectSet) {
 	if className == "" {
 		return
 	}
@@ -68,7 +68,7 @@ func addRowClassPackage(className string, regPackName string, packSet *yx.Set) {
 	}
 }
 
-func writeRegFunc(rowObjClasses *yx.Set, regPackName string, f *os.File) {
+func writeRegFunc(rowObjClasses *yx.ObjectSet, regPackName string, f *os.File) {
 	f.WriteString("// Auto generate by tool.\n")
 	f.WriteString("func RegisterRowObjs() {\n")
 
