@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	ErrCacheSubscribeFailed = errors.New("Subscribe failed")
+	ErrCacheHasExit         = errors.New("has exit")
+	ErrCacheSubscribeFailed = errors.New("subscribe failed")
 )
 
 type RedisSubscribeCb func(channel string, pattern string, payload string)
@@ -21,19 +22,22 @@ type RedisSubscribeCb func(channel string, pattern string, payload string)
 type CacheDriver struct {
 	db            *redis.Client
 	evtNotifyExit *yx.Event
-	evtExit       *yx.Event
+	chanExit      chan byte
 	logger        *yx.Logger
 	ec            *yx.ErrCatcher
 }
 
 func NewCacheDriver() *CacheDriver {
-	return &CacheDriver{
+	d := &CacheDriver{
 		db:            nil,
 		evtNotifyExit: yx.NewEvent(),
-		evtExit:       yx.NewEvent(),
+		chanExit:      make(chan byte, 1),
 		logger:        yx.NewLogger("CacheDriver"),
 		ec:            yx.NewErrCatcher("CacheDriver"),
 	}
+
+	d.chanExit <- 1
+	return d
 }
 
 func (d *CacheDriver) Open(addr string, pwd string, db int) error {
@@ -62,12 +66,19 @@ func (d *CacheDriver) Close() error {
 	}
 
 	d.evtNotifyExit.Close()
+	d.waitExitSub()
+
 	err := d.db.Close()
 	return d.ec.Throw("Close", err)
 }
 
-func (d *CacheDriver) WaitExit() {
-	d.evtExit.Wait()
+func (d *CacheDriver) exitSub() {
+	d.chanExit <- 1
+}
+
+func (d *CacheDriver) waitExitSub() {
+	<-d.chanExit
+	d.chanExit <- 1
 }
 
 func (d *CacheDriver) Publish(channel string, message interface{}) error {
@@ -76,13 +87,20 @@ func (d *CacheDriver) Publish(channel string, message interface{}) error {
 }
 
 func (d *CacheDriver) Subscribe(cb RedisSubscribeCb, channels ...string) error {
+	<-d.chanExit
+	defer d.exitSub()
+
+	exitChan := d.evtNotifyExit.GetChan()
+	if exitChan == nil {
+		return d.ec.Throw("Subscribe", ErrCacheHasExit)
+	}
+
 	pubsub := d.db.Subscribe(channels...)
 	if pubsub == nil {
 		return d.ec.Throw("Subscribe", ErrCacheSubscribeFailed)
 	}
 
 	ch := pubsub.Channel()
-	exitChan := d.evtNotifyExit.GetChan()
 
 	for {
 		select {
@@ -95,7 +113,7 @@ func (d *CacheDriver) Subscribe(cb RedisSubscribeCb, channels ...string) error {
 	}
 
 Exit0:
-	d.evtExit.Close()
+	// d.evtExit.Close()
 	return nil
 }
 
