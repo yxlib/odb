@@ -14,25 +14,24 @@ type CacheConf struct {
 type DBConf struct {
 	Tag     string `json:"tag"`
 	Addr    string `json:"addr"`
-	Port    uint16 `json:"port"`
-	DbName  string `json:"name"`
+	DbName  string `json:"db_name"`
 	Acc     string `json:"acc"`
 	Pwd     string `json:"pwd"`
 	Charset string `json:"charset"`
 }
 
 type WorkerConf struct {
-	Tag                   string            `json:"tag"`
-	IsOpenAutoSave        bool              `json:"is_open_auto_save"`
-	CacheKey              string            `json:"cache_key"`
-	MapCacheField2DbField map[string]string `json:"field_map"`
-	TableName             string            `json:"table_name"`
-	RowObj                string            `json:"row_obj"`
-	InsertTag             string            `json:"insert_tag"`
-	SelectTag             string            `json:"select_tag"`
-	SelectKeyTag          string            `json:"select_key_tag"`
-	UpdateTag             string            `json:"update_tag"`
-	UpdateKeyTag          string            `json:"update_key_tag"`
+	// MapCacheField2DbField map[string]string `json:"field_map"`
+	Tag            string `json:"tag"`
+	IsOpenAutoSave bool   `json:"is_open_auto_save"`
+	CacheKey       string `json:"cache_key"`
+	TableName      string `json:"table_name"`
+	RowObj         string `json:"row_obj"`
+	InsertTag      string `json:"insert_tag"`
+	SelectTag      string `json:"select_tag"`
+	SelectKeyTag   string `json:"select_key_tag"`
+	UpdateTag      string `json:"update_tag"`
+	UpdateKeyTag   string `json:"update_key_tag"`
 }
 
 type StorageConf struct {

@@ -40,7 +40,7 @@ func NewDbDriver(rowObjFactory *yx.ObjectFactory) *DbDriver {
 	}
 }
 
-func (d *DbDriver) Open(userName string, pwd string, host string, port uint16, database string, charset string) error {
+func (d *DbDriver) Open(userName string, pwd string, host string, database string, charset string) error {
 	var err error = nil
 	defer d.ec.DeferThrow("Open", &err)
 
@@ -48,7 +48,7 @@ func (d *DbDriver) Open(userName string, pwd string, host string, port uint16, d
 		return nil
 	}
 
-	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s", userName, pwd, host, port, database, charset)
+	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=%s", userName, pwd, host, database, charset)
 	d.logger.D("open db: ", dataSourceName)
 	db, err := sqlx.Open("mysql", dataSourceName)
 	if err != nil {

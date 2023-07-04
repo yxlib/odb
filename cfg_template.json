@@ -14,9 +14,8 @@
             "db" :
             {
                 "tag" : "mysql",
-                "addr" : "127.0.0.1",
-                "port" : 3306,
-                "name" : "odb",
+                "addr" : "127.0.0.1:3306",
+                "db_name" : "odb",
                 "acc" : "root",
                 "pwd" : "123456",
                 "charset": "utf8"
@@ -28,12 +27,7 @@
                     "is_open_auto_save" : true,
                     "cache_key" : "player_id",
                     "table_name" : "table1",
-                    "row_obj" : "github.com/yxlib/odb.TestTable1Row",
-                    "insert_tag" : "insert",
-                    "select_tag" : "select",
-                    "select_key_tag" : "select_key",
-                    "update_tag" : "update",
-                    "update_key_tag" : "update_key"
+                    "row_obj" : "github.com/yxlib/odb.TestTable1Row"
                 }
             ]
         }

@@ -36,7 +36,7 @@ func (b *builder) Build(dc *DataCenter, cfg *Config) {
 		dbCfg := storageCfg.Db
 		if dbCfg != nil {
 			dd = NewDbDriver(RowObjFactory)
-			err = dd.Open(dbCfg.Acc, dbCfg.Pwd, dbCfg.Addr, dbCfg.Port, dbCfg.DbName, dbCfg.Charset)
+			err = dd.Open(dbCfg.Acc, dbCfg.Pwd, dbCfg.Addr, dbCfg.DbName, dbCfg.Charset)
 			if err != nil {
 				b.logger.E("open db ", dbCfg.Tag, " err: ", err)
 				continue
