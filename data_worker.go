@@ -44,6 +44,10 @@ const (
 	UPDATE_KEY_TAG_DEFAULT = "uk"
 )
 
+type CacheSaver interface {
+	SaveCache(updateKeys []string) error
+}
+
 type DataWorker struct {
 	cacheDriver *CacheDriver
 	// mapCacheField2DbField map[string]string
@@ -61,6 +65,7 @@ type DataWorker struct {
 	updateSql           string
 	setUpdatedCacheKeys *yx.ObjectSet
 	lckUpdatedCacheKeys *sync.Mutex
+	saver               CacheSaver
 	bOpenAutoSave       bool
 	chanExitSave        chan byte
 	evtStop             *yx.Event
@@ -86,6 +91,7 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDr
 		updateSql:           "",
 		setUpdatedCacheKeys: yx.NewObjectSet(),
 		lckUpdatedCacheKeys: &sync.Mutex{},
+		saver:               nil,
 		bOpenAutoSave:       false,
 		chanExitSave:        make(chan byte, 1),
 		evtStop:             yx.NewEvent(),
@@ -162,6 +168,10 @@ func (w *DataWorker) Init(reflectName string, insertTag string, selectTag string
 	}
 
 	return nil
+}
+
+func (w *DataWorker) SetCacheSaver(saver CacheSaver) {
+	w.saver = saver
 }
 
 func (w *DataWorker) HasCache() bool {
@@ -650,7 +660,7 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 }
 
 func (w *DataWorker) SetCacheUpdated(key string) {
-	if !w.HasCache() || !w.HasDb() {
+	if !w.HasCache() {
 		return
 	}
 
@@ -659,12 +669,20 @@ func (w *DataWorker) SetCacheUpdated(key string) {
 }
 
 func (w *DataWorker) SaveCaches() error {
-	if !w.HasCache() || !w.HasDb() {
+	if !w.HasCache() {
 		return ErrNoCache
 	}
 
-	var err error = nil
+	if !w.HasDb() && w.saver == nil {
+		return ErrNoDb
+	}
+
 	cacheKeys := w.popUpdatedCacheKeys()
+	if w.saver != nil {
+		return w.saver.SaveCache(cacheKeys)
+	}
+
+	var err error = nil
 	for _, cacheKey := range cacheKeys {
 		err = w.saveCache(cacheKey)
 		if err != nil {
