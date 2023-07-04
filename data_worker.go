@@ -37,11 +37,11 @@ const (
 )
 
 const (
-	INSERT_TAG_DEFAULT     = "insert"
-	SELECT_TAG_DEFAULT     = "select"
-	SELECT_KEY_TAG_DEFAULT = "select_key"
-	UPDATE_TAG_DEFAULT     = "update"
-	UPDATE_KEY_TAG_DEFAULT = "update_key"
+	INSERT_TAG_DEFAULT     = "i"
+	SELECT_TAG_DEFAULT     = "s"
+	SELECT_KEY_TAG_DEFAULT = "sk"
+	UPDATE_TAG_DEFAULT     = "u"
+	UPDATE_KEY_TAG_DEFAULT = "uk"
 )
 
 type DataWorker struct {
@@ -62,9 +62,8 @@ type DataWorker struct {
 	setUpdatedCacheKeys *yx.ObjectSet
 	lckUpdatedCacheKeys *sync.Mutex
 	bOpenAutoSave       bool
-	bAutoSave           bool
+	chanExitSave        chan byte
 	evtStop             *yx.Event
-	evtExit             *yx.Event
 	logger              *yx.Logger
 	ec                  *yx.ErrCatcher
 }
@@ -88,13 +87,13 @@ func NewDataWorker(cacheDriver *CacheDriver, cacheKeyName string, dbDriver *DbDr
 		setUpdatedCacheKeys: yx.NewObjectSet(),
 		lckUpdatedCacheKeys: &sync.Mutex{},
 		bOpenAutoSave:       false,
-		bAutoSave:           false,
+		chanExitSave:        make(chan byte, 1),
 		evtStop:             yx.NewEvent(),
-		evtExit:             yx.NewEvent(),
 		logger:              yx.NewLogger("DataWorker"),
 		ec:                  yx.NewErrCatcher("DataWorker"),
 	}
 
+	w.chanExitSave <- 1
 	w.initCacheFields()
 	// if len(w.mapCacheField2DbField) == 0 {
 	// 	w.initCacheField2DbField()
@@ -184,10 +183,16 @@ func (w *DataWorker) IsOpenAutoSave() bool {
 func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration) {
 	w.logger.I("Auto save for table: ", w.tableName)
 
-	w.bAutoSave = true
+	<-w.chanExitSave
+	defer w.exitSave()
+
+	stopChan := w.evtStop.GetChan()
+	if stopChan == nil {
+		return
+	}
+
 	saveTicker := time.NewTicker(saveIntv)
 	clearExpireTick := time.NewTicker(clearExpireIntv)
-	stopChan := w.evtStop.GetChan()
 
 	for {
 		select {
@@ -206,17 +211,20 @@ func (w *DataWorker) Start(saveIntv time.Duration, clearExpireIntv time.Duration
 Exit0:
 	saveTicker.Stop()
 	clearExpireTick.Stop()
-	w.evtExit.Close()
-	w.bAutoSave = false
 }
 
 func (w *DataWorker) Stop() {
-	if !w.bAutoSave {
-		return
-	}
-
 	w.evtStop.Close()
-	w.evtExit.Wait()
+	w.waitExitSave()
+}
+
+func (w *DataWorker) exitSave() {
+	w.chanExitSave <- 1
+}
+
+func (w *DataWorker) waitExitSave() {
+	<-w.chanExitSave
+	w.chanExitSave <- 1
 }
 
 func (w *DataWorker) LoadFromCache(obj Cacheable, key string) error {
@@ -323,11 +331,11 @@ func (w *DataWorker) SetCacheData(obj Cacheable, key string, fields ...string) e
 
 	updateTime := time.Now().UnixNano()
 	mapField2Val[CACHE_FIELD_UPDATE_TIME] = strconv.FormatInt(updateTime, 10)
-	err = w.SetCacheDataByMap(key, mapField2Val)
+	err = w.SetCacheDataByMap(key, mapField2Val, true)
 	return err
 }
 
-func (w *DataWorker) SetCacheDataByMap(key string, mapField2Val map[string]interface{}) error {
+func (w *DataWorker) SetCacheDataByMap(key string, mapField2Val map[string]interface{}, bMarkUpdate bool) error {
 	if !w.HasCache() {
 		return w.ec.Throw("SetCacheDataByMap", ErrNoCache)
 	}
@@ -338,7 +346,10 @@ func (w *DataWorker) SetCacheDataByMap(key string, mapField2Val map[string]inter
 		return w.ec.Throw("SetCacheDataByMap", err)
 	}
 
-	w.setCacheUpdatedImpl(cacheKey)
+	if bMarkUpdate {
+		w.setCacheUpdatedImpl(cacheKey)
+	}
+
 	return nil
 }
 
@@ -623,7 +634,7 @@ func (w *DataWorker) PreloadData(obj Cacheable, mapper interface{}) error {
 	// cache
 	updateTime := time.Now().UnixNano()
 	mapField2Val[CACHE_FIELD_UPDATE_TIME] = strconv.FormatInt(updateTime, 10)
-	err = w.SetCacheDataByMap(key, mapField2Val)
+	err = w.SetCacheDataByMap(key, mapField2Val, false)
 	if err != nil {
 		return err
 	}
