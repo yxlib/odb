@@ -679,6 +679,10 @@ func (w *DataWorker) SaveCaches() error {
 
 	cacheKeys := w.popUpdatedCacheKeys()
 	if w.saver != nil {
+		for i, cacheKey := range cacheKeys {
+			cacheKeys[i] = w.getKey(cacheKey)
+		}
+
 		return w.saver.SaveCache(cacheKeys)
 	}
 
